@@ -2,7 +2,6 @@ from typing import Final
 import os
 from dotenv import load_dotenv
 from discord import Intents, Client, Message
-from responses import get_response
 from commands import parse_command, check_if_authorized
 
 load_dotenv()
@@ -12,21 +11,6 @@ intents: Intents = Intents.default()
 intents.message_content = True
 intents.members = True
 client: Client = Client(intents=intents)
-
-async def send_message(message: Message, user_message: str) -> None:
-    if not user_message:
-        print('(Message was empty)')
-        return
-
-    is_private = (user_message[0] == '?')
-    if is_private:
-        user_message = user_message[1:]
-
-    try:
-        response: str = get_response(user_message)
-        await message.author.send(response) if is_private else await message.channel.send(response)
-    except Exception as e:
-        print(e)
 
 def basic_message_stat_dump(message):
     print(f"Got message: {message.content}")
