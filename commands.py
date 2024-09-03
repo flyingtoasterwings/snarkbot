@@ -10,6 +10,7 @@ COMMAND_REGEX = None
 COMMAND_PREFIX="+sb"
 COMMAND_REGEX_STR = r"\s+(?P<command>\S+)(\s+(?P<args>.+))?"
 RP_CATEGORIES_KEY = "rp_categories"
+RP_CHANNELS_KEY = "rp_channels"
 ENABLED_ROLES_KEY = "enabled_roles"
 DATA_DICT = None
 
@@ -41,6 +42,9 @@ def get_guild_data(guild):
     if not RP_CATEGORIES_KEY in guild_dict:
         print("Adding rp_categories key to data for guild")
         guild_dict[RP_CATEGORIES_KEY] = []
+    if not RP_CHANNELS_KEY in guild_dict:
+        print("Adding rp_channels key to data for guild")
+        guild_dict[RP_CHANNELS_KEY] = []
     if not ENABLED_ROLES_KEY in guild_dict:
         print("Adding enabled_roles key to data for guild")
         guild_dict[ENABLED_ROLES_KEY] = []
@@ -109,6 +113,16 @@ COMMAND_DICT = {
             "desc" : "Show all of the current RP categories",
             "func" : "cmd_list_rp_cats"
         },
+        "addrpchan" : {
+            "usage" : "addrpchan <category>.<channel>",
+            "desc" : "Add an individual channel to the list of checked channels for RP",
+            "func" : "cmd_add_rp_channel"
+        },
+        "listrpchans" : {
+            "usage" : "listrpchans",
+            "desc" : "Show all of the individual RP channels (will not list categories)",
+            "func" : "cmd_list_rp_channels"
+        },
         "adduserrole" : {
             "usage" : "adduserrole <rolename>",
             "desc" : "Add a role that qualifies somebody to use the bot commands",
@@ -136,6 +150,15 @@ COMMAND_DICT = {
         }
 }
 
+def get_channel_by_qualified_name(guild, name):
+    category_name, channel_name = name.split(".",1)
+    category = get_category_by_name(guild, category_name)
+    if category:
+        for text_channel in category.text_channels:
+            if text_channel.name.lower() == channel_name.lower():
+                return text_channel
+    return None
+
 def get_category_by_name(guild, name):
     category_list = guild.categories
     for category in category_list:
@@ -148,6 +171,14 @@ def get_category_by_id(guild, id_str):
     for category in category_list:
         if str(category.id) == id_str:
             return category
+    return None
+
+def get_channel_by_id(guild, id_str):
+    category_list = guild.categories
+    for category in category_list:
+        for channel in category.text_channels:
+            if str(channel.id) == id_str:
+                return channel
     return None
 
 def get_role_by_name(guild, name):
@@ -171,6 +202,10 @@ def get_text_channels(guild):
         category = get_category_by_id(guild, category_id)
         for text_channel in category.text_channels:
             text_channel_list.append(text_channel)
+    for channel_id in guild_data[RP_CHANNELS_KEY]:
+        channel = get_channel_by_id(guild, channel_id)
+        if channel:
+            text_channel_list.append(channel)
     return text_channel_list
 
 def get_member_by_id(guild, member_id):
@@ -257,6 +292,19 @@ async def cmd_add_rp_cat(message, args):
     else:
         await message.channel.send(args + " is not a valid category")
 
+async def cmd_add_rp_channel(message, args):
+    channel = get_channel_by_qualified_name(message.guild, args)
+    if channel != None:
+        guild_data = get_guild_data(message.guild)
+        if not str(channel.id) in guild_data[RP_CHANNELS_KEY]:
+            guild_data[RP_CHANNELS_KEY].append(str(channel.id))
+            await message.channel.send("Added channel " + channel.name)
+            save_data_dict()
+        else:
+            await message.channel.send("Channel " + channel.name + " is already added")
+    else:
+        await message.channel.send(args + " is not a valid category/channel name")
+
 async def cmd_list_rp_cats(message, args):
     guild_data = get_guild_data(message.guild)
     category_list = []
@@ -271,6 +319,23 @@ async def cmd_list_rp_cats(message, args):
     string_out_list.append("Current RP categories:```")
     for category in category_list:
         string_out_list.append(f"Category: {category.name}\n")
+    string_out_list.append("```")
+    await message.channel.send("".join(string_out_list))
+
+async def cmd_list_rp_channels(message, args):
+    guild_data = get_guild_data(message.guild)
+    channel_list = []
+    for channel_id in guild_data[RP_CHANNELS_KEY]:
+        channel = get_channel_by_id(message.guild, channel_id)
+        if channel:
+            channel_list.append(channel)
+    if len(channel_list) == 0:
+        await message.channel.send("There are no current RP channels")
+        return
+    string_out_list = []
+    string_out_list.append("Current RP channels:```")
+    for channel in channel_list:
+        string_out_list.append(f"Channel: {channel.name}\n")
     string_out_list.append("```")
     await message.channel.send("".join(string_out_list))
 
@@ -341,3 +406,5 @@ async def cmd_get_all_rp(message, args):
             await message.channel.send(format_member_post_out(member, post_map[member]))
         else:
             await message.channel.send(f"{member.name} has no RP posts found")
+
+
